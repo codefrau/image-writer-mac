@@ -199,7 +199,7 @@ def write_image_to_disk (image_filename, usb_disk):
     # show progress (percentage ticking)
     while p.poll() == None:
         time.sleep(1)
-        p.send_signal(signal.SIGINFO)
+        os.kill(p.pid, signal.SIGINFO)
         recordsIn = p.stderr.readline().strip()
         recordsOut = p.stderr.readline().strip()
         bytesTransferred = p.stderr.readline().strip()
