@@ -171,7 +171,7 @@ def get_current_udisks():
     usb_devices = []
     for disk in diskutil_list():
         info = diskutil_info(disk)
-        if info["Protocol"] == "USB" and info["Read-Only Media"] == "No":
+        if info["Protocol"] == "USB":
             usb_devices.append(disk)
     return usb_devices
 
