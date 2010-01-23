@@ -2,6 +2,7 @@
 # vim: ai ts=4 sts=4 et sw=4
 
 #    Copyright (c) 2008 Intel Corporation
+#    Copyright (c) 2009 Bert Freudenberg
 #
 #    This program is free software; you can redistribute it and/or modify it
 #    under the terms of the GNU General Public License as published by the Free
@@ -21,6 +22,7 @@ import os
 import gettext
 import re
 import subprocess
+import signal
 import time
 import select
 
@@ -36,12 +38,6 @@ def main():
     if sys.hexversion < 0x2040000:
         print >> sys.stderr, _("Error: %s depends on a Python " \
                                "v2.4 or greater!") % (PROG_NAME)
-        sys.exit(1)
-
-    # Check for root priveleges
-    if not are_we_root():
-        print >> sys.stderr, _("%s must be run using " \
-                               "root priveleges") % (PROG_NAME)
         sys.exit(1)
 
     # Parameters check
@@ -64,7 +60,7 @@ def main():
         sys.exit(1)
 
     # Warn of pending USB content doom
-    msg = _("Warning:  The USB drive (%s) will be completely erased!") % usbd
+    msg = _("Warning:  The USB drive (%s) will be completely erased!") % diskutil_name(usbd)
     if not user_confirm (msg, COLOR_RED):
         sys.exit(1)
 
@@ -123,7 +119,7 @@ def get_usb_disk():
         print _("\nMultiple USB drives discovered:")
         i=1
         for usbd in udisks:
-            print "%s) %s" % (i, usbd)
+            print "%s) %s" % (i, diskutil_name(usbd))
             i+=1
         sel_usb = ""
         while sel_usb not in range (1,len(udisks)+1):
@@ -133,106 +129,83 @@ def get_usb_disk():
             except ValueError:
                 continue
         usbd = udisks[sel_usb-1]
-    #print "Drive selected: '%s'" % (usbd)
+    #print "Drive selected: '%s'" % (diskutil_name(usbd))
     return usbd
+
+def diskutil(*args):
+    return subprocess.Popen(("diskutil",) + args, stdout=subprocess.PIPE).communicate()[0].splitlines()
+
+def diskutil_list():
+    return [d for d in diskutil("list") if d.startswith("/")]
+
+def diskutil_info(disk):
+    info = {}
+    for line in diskutil("info", disk):
+        try:
+            (key, value) = line.split(":", 1)
+            info[key.strip()] = value.strip()
+        except:
+            pass
+    return info
+
+diskutil_name_cache = {}
+def diskutil_name(disk):
+    if disk not in diskutil_name_cache:
+        name = diskutil_info(disk)['Volume Name']
+        if name == "":
+            for line in diskutil("list", disk):
+                try:
+                    (partition, description) = line.split(":", 1)
+                    if partition.strip() != '#':
+                        if name != "":
+                            name += ","
+                        name += line[33:56].strip()
+                except:
+                    pass
+        if name == "":
+            name = "Untitled"
+        diskutil_name_cache[disk] = "%s [%s]" % (name, disk) 
+    return diskutil_name_cache[disk]
 
 def get_current_udisks():
     usb_devices = []
-    dirname = os.path.realpath(os.path.abspath('/sys/bus/scsi'))
-    work_list = get_usb_dir_tree(dirname)
-    usb_list = [ x for x in work_list if re.search(r'usb', x) ]
-    for filename in usb_list:
-        #print _("usb_list file is %s") % filename
-        device_dir = os.path.join('/sys/devices', filename)
-        block_dir = os.path.join(device_dir, 'block')
-        if (os.path.isdir(block_dir)) :
-            for result in os.listdir(block_dir):
-                #print result
-                usb_dev = os.path.join('/dev',result)
-                if os.path.exists(usb_dev):
-                    usb_devices.append(usb_dev)
-                break
-        elif os.path.isdir(device_dir):
-            for device_file in os.listdir(device_dir):
-                full_path = os.path.join(device_dir, device_file)
-                result = re.search(r'^block:(?P<dev>.*)', device_file)
-                if result:
-                    usb_dev = os.path.join('/dev', result.group('dev'))
-                    if os.path.exists(usb_dev):
-                        usb_devices.append(usb_dev)
-                    break
+    for disk in diskutil_list():
+        info = diskutil_info(disk)
+        if info["Protocol"] == "USB" and info["Read-Only Media"] == "No":
+            usb_devices.append(disk)
     return usb_devices
 
-def get_usb_dir_tree(dirname):
-    file_set = set()
-    for filename in os.listdir(dirname):
-        full_path = os.path.join(dirname, filename)
-        if os.path.islink(full_path):
-            file_set.add(os.path.realpath(full_path))
-        elif os.path.isdir(full_path):
-            file_set.update(get_usb_dir_tree(full_path))
-        else:
-            file_set.add(full_path)
-    return file_set
-
 def umount_device(device):
-    """umount a device if it is mounted"""
-    dev_path = "%s1 " % os.path.realpath(os.path.abspath(device))
-
-    if is_mounted(dev_path):
-        print _("Unmounting %s...") % (dev_path) , 
-        result = os.system("umount %s" % (dev_path))
-        if result and is_mounted(dev_path):
-            print _("Failed.\n%s could not be unmounted") % device
-            return False
-        print _("Done.")
+    diskutil("unmountDisk", device)
     return True
 
-def is_mounted (dirname):
-    mount_file = open('/proc/mounts', 'r')
-    for line in mount_file:
-        if line.find(dirname) == 0:
-            #return True  (causes failures later)
-            return False
-    return False
-
 def write_image_to_disk (image_filename, usb_disk):
-# image write timings
-#   200 == 78s
-#   422 == 165s
-#  1036 == 413s
     size = os.path.getsize(image_filename)
     print _("Source:      %s") % image_filename
     print _("Size:        %s MB") % (int(size/(1024*1024)))
-    print _("Destination: %s") % usb_disk
+    print _("Destination: %s") % diskutil_name(usb_disk)
     #(tbd, get usb capacity): print _("Capacity:    %s") % ("1GB")
 
-    # get time estimate based on image size (assume 10MB/sec)
-    totsec = int(size / (5*1024*1024))
-    min,sec = divmod(totsec, 60)
-
-    msg = _("Writing image (Est. %smin %ssec)...    ") % (min,sec)
+    msg = _("Writing image ...")
     print _("%s%s%s") % (COLOR_BLUE, msg, COLOR_BLACK) ,
 
-    cmd = "dd bs=4096 if=%s of=%s" % (image_filename, usb_disk)
-
-    p = subprocess.Popen(cmd.split(), 
-                         stdout = subprocess.PIPE, 
-                         stderr = subprocess.STDOUT, 
-                         stdin = subprocess.PIPE, 
+    cmd = ["dd", "bs=262144", "if=%s" % image_filename, "of=%s" % usb_disk]
+ 
+    p = subprocess.Popen(cmd,
+                         stdout = subprocess.PIPE,
+                         stderr = subprocess.PIPE,
                          close_fds = True)
 
     # show progress (percentage ticking)
-    poll = select.poll()
-    poll.register(p.stdout, select.POLLIN)
-    interval = (totsec / 100.0)
-    perc = 0
     while p.poll() == None:
+        time.sleep(1)
+        p.send_signal(signal.SIGINFO)
+        recordsIn = p.stderr.readline().strip()
+        recordsOut = p.stderr.readline().strip()
+        bytesTransferred = p.stderr.readline().strip()
+        perc = int(bytesTransferred.split()[0]) * 100 / size
         print _("%s\b\b\b\b%2s%%%s") % (COLOR_BLUE, perc, COLOR_BLACK) ,
-        time.sleep(interval)
-        if perc < 99:
-            perc+=1
-    print _("%s\b\b\b\b100%%%s") % (COLOR_BLUE, COLOR_BLACK)
+    print _("%s\b\b\b\b\b100%%%s") % (COLOR_BLUE, COLOR_BLACK)
 
     # show output of command
     (sout,serr) = p.communicate()
