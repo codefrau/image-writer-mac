@@ -152,6 +152,8 @@ diskutil_name_cache = {}
 def diskutil_name(disk):
     if disk not in diskutil_name_cache:
         name = diskutil_info(disk)['Volume Name']
+        if name.startswith("Not applicable"):
+            name = ""
         if name == "":
             for line in diskutil("list", disk):
                 try:
