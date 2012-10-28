@@ -27,7 +27,7 @@ import time
 import select
 
 _ = gettext.lgettext
-PROG_NAME = "image-writer"
+PROG_NAME = "image-writer-mac"
 COLOR_BLACK = "\033[00m"
 COLOR_RED =   "\033[1;31m"
 COLOR_BLUE =  "\033[1;34m"
@@ -74,7 +74,7 @@ def main():
 #-----------------------------------------------------------------------
 
 def display_help():
-    print _("\nUsage: image-writer <full-path-to-image>\n")
+    print _("\nUsage: %s <full-path-to-image>\n") % PROG_NAME
 
 # ret True = running as root
 def are_we_root():
