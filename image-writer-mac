@@ -129,7 +129,7 @@ def get_usb_disk():
             except ValueError:
                 continue
         usbd = udisks[sel_usb-1]
-    #print "Drive selected: '%s'" % (diskutil_name(usbd))
+    print "%sDrive selected: %s%s" % (COLOR_BLUE, diskutil_name(usbd), COLOR_BLACK)
     return usbd
 
 def diskutil(*args):
@@ -151,7 +151,10 @@ def diskutil_info(disk):
 diskutil_name_cache = {}
 def diskutil_name(disk):
     if disk not in diskutil_name_cache:
-        name = diskutil_info(disk)['Volume Name']
+        info = diskutil_info(disk)
+        name = info['Volume Name']
+        media = info['Device / Media Name']
+        size = info['Total Size']
         if name.startswith("Not applicable"):
             name = ""
         if name == "":
@@ -166,14 +169,19 @@ def diskutil_name(disk):
                     pass
         if name == "":
             name = "Untitled"
-        diskutil_name_cache[disk] = "%s [%s]" % (name, disk) 
+        size = " ".join(size.split()[:2])
+        diskutil_name_cache[disk] = "%s [%s, %s, %s]" % (name, disk, media, size) 
     return diskutil_name_cache[disk]
 
 def get_current_udisks():
     usb_devices = []
+    print _("%sLooking for storage devices...%s") % (COLOR_BLUE, COLOR_BLACK)
     for disk in diskutil_list():
         info = diskutil_info(disk)
-        if info["Protocol"] == "USB":
+        protocol = info["Protocol"]
+        name = diskutil_name(disk)
+        print "%s: %s" % (protocol, name)
+        if protocol == "USB":
             usb_devices.append(disk)
     return usb_devices
 
@@ -205,17 +213,27 @@ def write_image_to_disk (image_filename, usb_disk):
         recordsIn = p.stderr.readline().strip()
         recordsOut = p.stderr.readline().strip()
         bytesTransferred = p.stderr.readline().strip()
-        perc = int(bytesTransferred.split()[0]) * 100 / size
-        print _("%s\b\b\b\b%2s%%%s") % (COLOR_BLUE, perc, COLOR_BLACK) ,
-    print _("%s\b\b\b\b\b100%%%s") % (COLOR_BLUE, COLOR_BLACK)
+        try:
+            perc = int(bytesTransferred.split()[0]) * 100 / size
+            print "%s\b\b\b\b%2s%%%s" % (COLOR_BLUE, perc, COLOR_BLACK) ,
+        except:
+            print recordsIn
+            print recordsOut
+            print bytesTransferred
+            pass
+    if p.returncode == 0:
+        print "%s\b\b\b\b\b100%%%s" % (COLOR_BLUE, COLOR_BLACK)
+    else:
+        print
 
-    # show output of command
+    # show errors or output of command
     (sout,serr) = p.communicate()
+    for line in serr.split('\n'):
+        print line
     for line in sout.split('\n'):
         print line
 
-    result = p.returncode
-    if result != 0:
+    if p.returncode != 0:
         print _("Error:  The image could not be written to the USB drive")
         return False
     print _("The image was successfully written to the USB drive")
