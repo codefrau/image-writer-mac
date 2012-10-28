@@ -95,8 +95,8 @@ def is_valid_image(image):
 
 def user_confirm(msg, text_color=COLOR_BLACK,
                  confirm=_(" Do you want to continue anyway? (y/n) ")):
-    print _("%s%s%s") % (text_color, msg, COLOR_BLACK)
-    confirm_msg = _("%s%s%s") % (text_color, confirm, COLOR_BLACK)
+    print "%s%s%s" % (text_color, msg, COLOR_BLACK)
+    confirm_msg = "%s%s%s" % (text_color, confirm, COLOR_BLACK)
     name=""
     while name!="n" and name!="y":
         name = raw_input(confirm_msg)
@@ -189,7 +189,7 @@ def write_image_to_disk (image_filename, usb_disk):
     #(tbd, get usb capacity): print _("Capacity:    %s") % ("1GB")
 
     msg = _("Writing image ...")
-    print _("%s%s%s") % (COLOR_BLUE, msg, COLOR_BLACK) ,
+    print "%s%s%s" % (COLOR_BLUE, msg, COLOR_BLACK) ,
 
     cmd = ["dd", "bs=262144", "if=%s" % image_filename, "of=%s" % usb_disk]
  
