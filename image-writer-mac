@@ -182,7 +182,11 @@ def get_current_udisks():
         name = diskutil_name(disk)
         print "%s: %s" % (protocol, name)
         if protocol in ["USB", "Secure Digital"]:
-            usb_devices.append(disk)
+            rdisk = disk.replace("/dev/disk", "/dev/rdisk")
+            if os.path.exists(rdisk):
+                usb_devices.append(rdisk)
+            else:
+                usb_devices.append(disk)
     return usb_devices
 
 def umount_device(device):
@@ -199,7 +203,7 @@ def write_image_to_disk (image_filename, usb_disk):
     msg = _("Writing image ...")
     print "%s%s%s" % (COLOR_BLUE, msg, COLOR_BLACK) ,
 
-    cmd = ["dd", "bs=262144", "if=%s" % image_filename, "of=%s" % usb_disk]
+    cmd = ["dd", "bs=1m", "if=%s" % image_filename, "of=%s" % usb_disk]
  
     p = subprocess.Popen(cmd,
                          stdout = subprocess.PIPE,
