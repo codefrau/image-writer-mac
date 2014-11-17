@@ -60,7 +60,7 @@ def main():
         sys.exit(1)
 
     # Warn of pending USB content doom
-    msg = _("Warning:  The USB drive (%s) will be completely erased!") % diskutil_name(usbd)
+    msg = _("Warning:  The drive (%s) will be completely erased!") % diskutil_name(usbd)
     if not user_confirm (msg, COLOR_RED):
         sys.exit(1)
 
@@ -68,7 +68,7 @@ def main():
     if not write_image_to_disk (image, usbd):
         sys.exit(1)
 
-    print _("You may now boot your mobile device with this USB drive\n")
+    print _("You may now boot your mobile device with this drive\n")
     return 0
 
 #-----------------------------------------------------------------------
@@ -109,14 +109,14 @@ def get_usb_disk():
     usbd = ""
     udisks = get_current_udisks();
     if len(udisks)==0:
-        print _("No USB drives detected.")
-        print _("Please insert a USB drive large enough to store the " \
+        print _("No removable storage detected.")
+        print _("Please insert an SD card or USB drive large enough to store the " \
                 "given image")
         return ""
     elif len(udisks)==1:
         usbd=udisks[0]
     elif len(udisks)>0:
-        print _("\nMultiple USB drives discovered:")
+        print _("\nMultiple removable drives discovered:")
         i=1
         for usbd in udisks:
             print "%s) %s" % (i, diskutil_name(usbd))
@@ -181,7 +181,7 @@ def get_current_udisks():
         protocol = info["Protocol"]
         name = diskutil_name(disk)
         print "%s: %s" % (protocol, name)
-        if protocol == "USB":
+        if protocol in ["USB", "Secure Digital"]:
             usb_devices.append(disk)
     return usb_devices
 
@@ -234,9 +234,9 @@ def write_image_to_disk (image_filename, usb_disk):
         print line
 
     if p.returncode != 0:
-        print _("Error:  The image could not be written to the USB drive")
+        print _("Error:  The image could not be written to the drive")
         return False
-    print _("The image was successfully written to the USB drive")
+    print _("The image was successfully written to the drive")
     return True
 
 
